@@ -15,7 +15,7 @@ using System.Net;
 using System.Threading;
 using UnityEngine.Networking;
 
-public class TestRun : MonoBehaviour,IDisposable
+public class TestRun : MonoBehaviour, IDisposable
 {
     public AudioSource audioSource;
     string[] allAssetBundleNames;
@@ -24,24 +24,48 @@ public class TestRun : MonoBehaviour,IDisposable
     private void OnDestroy()
     {
         ///PackKit.Instance.Destroy();
-        _socket.Close();
-        _socket.Dispose();
-        _socket = null;
+      //  print("destoy");
+        if (socClient != null) {
+            socClient.Dispose();
+            thread.Abort();
+            thread = null;
+        }
+        //if (thread != null) {
+        //    thread.Abort();
+        //    thread = null;
+        //}
+      
     }
-   
+
     static Socket _socket = null;
-    byte[] bf=new byte[1024*1024];
+    Thread thread=null ;
+
+    SocClient socClient;
+    byte[] bf = new byte[1024 * 1024];
+    private void Run() {
+
+        thread = new Thread(() =>
+        {
+            socClient = new SocClient("127.0.0.1", 8081);
+        });
+        thread.Start();
+        //thread =  new System.Threading.Thread(TestThread);
+        //  thread.Start();
+    }
+    private void TestThread()
+    {
+        //int i = 0;
+        //while (i < 100)
+        //{
+        //    Debug.Log("TestThread running : " + i);
+        //    System.Threading.Thread.Sleep(1000);
+        //    i++;
+        //}
+    }
     // Start is called before the first frame update
     void Start()
     {
-        new Thread(()=> {
-            _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            _socket.Connect(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 8081));
-       
-            _socket.BeginReceive(bf, 0, bf.Length, SocketFlags.None, callback, null);
-        }).Start();
- 
-       
+        Run();
         //_socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         //_socket.Connect(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 8081));
 
@@ -88,23 +112,26 @@ public class TestRun : MonoBehaviour,IDisposable
     /// 发送消息实例
     /// </summary>
     public void SendMessage() {
-      //  int i = 0;
+        //  int i = 0;
         //字节长度+字节数组
         //while (i<=100) {
-
-      
-      //  string str = "Hello" + i;
-        string str = "Login";
-            Bufferbyte bufferbyte = new Bufferbyte();
-            bufferbyte.WriteString(str);
-            bufferbyte.WriteInt(123456);
-            bufferbyte.WriteString("zrm123");
-            bufferbyte.SendMessage(_socket);
+        Bufferbyte bufferbyte = new Bufferbyte();
+        bufferbyte.WriteString("Login");
+        bufferbyte.WriteInt(123456);
+        bufferbyte.WriteString("zrm123");
+        socClient.SendMessage(bufferbyte);
+        //  string str = "Hello" + i;
+        //string str = "Login";
+        //    Bufferbyte bufferbyte = new Bufferbyte();
+        //    bufferbyte.WriteString(str);
+        //    bufferbyte.WriteInt(123456);
+        //    bufferbyte.WriteString("zrm123");
+        //    bufferbyte.SendMessage(_socket);
         // byte [] bufferLen = Encoding.UTF8.GetBytes((Encoding.UTF8.GetBytes(str).Length).ToString());
-       // print(Encoding.UTF8.GetBytes(str).Length);
-       //==================普通发送方式
+        // print(Encoding.UTF8.GetBytes(str).Length);
+        //==================普通发送方式
         //byte [] bufferLen = BitConverter.GetBytes(Encoding.UTF8.GetBytes(str).Length);
-        
+
         //byte[] buffer = Encoding.UTF8.GetBytes(str);
         //byte[] newBuff = new byte[buffer.Length+bufferLen.Length];
         //Array.Copy(bufferLen,0,newBuff,0,bufferLen.Length);
@@ -112,8 +139,8 @@ public class TestRun : MonoBehaviour,IDisposable
         //    print("发送消息" + str + "成功");
         //    _socket.Send(newBuff);
         //=================
-          //  i++;
-     //   }
+        //  i++;
+        //   }
         // Array arr = new Array();
         //Array.Copy(bufferLen,newBuff,0, bufferLen.Length);
 
