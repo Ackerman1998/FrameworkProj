@@ -13,8 +13,6 @@ namespace GameServ.Server
     {
         private Socket socket = null;
         private Dictionary<int, Client> clients=null;
-        private MessageQueue<MessageNode> receiveQueue = new MessageQueue<MessageNode>();//接收queue
-        private SendMessageQueue<MessageNode> sendQueue = new SendMessageQueue<MessageNode>();//发送queue
         /// <summary>
         /// 初始化
         /// </summary>
@@ -22,9 +20,7 @@ namespace GameServ.Server
         /// <param name="port"></param>
         public SocServer(string ip, int port)
         {
-            //开启接收
-            receiveQueue.Start();
-            //sendQueue.Start();
+            Console.WriteLine(GetIP());
             clients = new Dictionary<int, Client>();
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             socket.Bind(new IPEndPoint(IPAddress.Parse(ip), port));
@@ -32,7 +28,26 @@ namespace GameServ.Server
             socket.Listen(100);
             Console.WriteLine("Soc Service Start...");
         }
-       
+        private static string GetIP()
+        {
+            string tempip = "";
+            try
+            {
+                WebRequest wr = WebRequest.Create("http://www.ip138.com/ips138.asp");
+                Stream s = wr.GetResponse().GetResponseStream();
+                StreamReader sr = new StreamReader(s, Encoding.Default);
+                string all = sr.ReadToEnd(); //读取网站的数bai据
+                int start = all.IndexOf("您的IP地址是：[") + 9;
+                int end = all.IndexOf("]", start);
+                tempip = all.Substring(start, end - start);
+                sr.Close();
+                s.Close();
+            }
+            catch
+            {
+            }
+            return tempip;
+        }
         public void StartAccept()
         {
             socket.BeginAccept(new AsyncCallback(NetCallBack), socket);
@@ -54,27 +69,14 @@ namespace GameServ.Server
 
 
         }
-        /// <summary>
-        /// 异步处理接收到的消息
-        /// </summary>
-        /// <param name="mn"></param>
-        public void AddDataToReceive(MessageNode mn) {
-            receiveQueue.AppendMessage(mn);
-        }
-        /// <summary>
-        /// 发送消息
-        /// </summary>
-        public void AddDataToSend()
-        {
-
-        }
+       
+      
     }
     class Client {
         private Socket clientSoc = null;
         private SocServer server = null;
         private string name = null;
         byte[] buff = new byte[1024];
-        Bufferbyte bufferbyte = new Bufferbyte(1024*1024);
         public Client(Socket soc,string name,SocServer server) {
             this.clientSoc = soc;
             this.name = name;
@@ -93,29 +95,15 @@ namespace GameServ.Server
                 Close();
             }
             else {
-               
+                Bufferbyte bufferbyte = new Bufferbyte(1024);
                 bufferbyte.WriteBytes(buff);
-                //string method = bufferbyte.ReadString();
-                //EventDispatch.DispatchEvent(method,bufferbyte);
-                CreateMessage(bufferbyte);
-                bufferbyte.Clear();
+                string method = bufferbyte.ReadString();
+                EventDispatch.DispatchEvent(method,bufferbyte);
+                
                 clientSoc.BeginReceive(buff, 0, buff.Length, SocketFlags.None, ReceiveCallBack, clientSoc);
             }
         }
-        /// <summary>
-        /// handle message
-        /// </summary>
-        /// <param name="bufferbyte"></param>
-        private void CreateMessage(Bufferbyte buffer) {
-            string methodName = buffer.ReadString();
-            Bufferbyte bufferbyte = new Bufferbyte();
-            bufferbyte.WriteBytes(buffer.GetBytes(),buffer.ReadIndex);
-            MessageNode messageNode = new MessageNode();
-            messageNode.methodName = methodName;
-            messageNode.bufferbyte = bufferbyte;
-            messageNode.client = clientSoc;
-            server.AddDataToReceive(messageNode);
-        }
+
         public void Close() {
             Console.WriteLine(name+" disconnect...");
             clientSoc.Close();
@@ -123,8 +111,3 @@ namespace GameServ.Server
         }
     }
 }
-/*
-通信数据的格式：
-方法名+若干个参数 （例如：string + int + int ==> "Login" + 123456 + 123456）
-     
-     */

@@ -10,8 +10,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using LitJson;
 using GameServ.Utils;
-using GameServ.Test;
-
 namespace GameServ
 {
     class Program
@@ -54,49 +52,14 @@ namespace GameServ
         static Socket _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);  //侦听socket
         static void Main(string[] args)
         {
-            //test Messagequeue
-
-            //MessageQueue<string> message = new MessageQueue<string>();
-            //message.Start();
-            //Console.WriteLine("5秒后开启线程1，2...");
-            //Thread.Sleep(5000);
-            //new Thread(() =>
-            //{
-            //    for (int i = 0; i < 100; i++)
-            //    {
-            //        Thread.Sleep(100);
-            //        message.AppendMessage("test void1 " + i);
-            //    }
-
-            //}).Start();
-            //new Thread(() =>
-            //{
-            //    for (int i = 0; i < 100; i++)
-            //    {
-            //        Thread.Sleep(200);
-            //        message.AppendMessage("test void2 " + i);
-            //    }
-
-            //}).Start();
-            //for (int i = 0; i < 100; i++)
-            //{
-            //    message.AppendMessage("test void2 " + i);
-            //}
-            //MessageHandler message = new MessageHandler();
-            //message.Start();
-            //for (int i=0;i<100;i++) {
-            //    message.AppendMessage("test void " + i);
-            //}
-
             RegisterVoid();//注册一些方法
-            Console.WriteLine("http start...");
-            GameServ.Server.SocServer hs = new Server.SocServer("127.0.0.1", 8081);
+           // Console.WriteLine("http start...");
+            GameServ.Server.SocServer hs = new Server.SocServer("127.0.0.1",8081);
             hs.StartAccept();
             Console.ReadKey();
         }
         static void RegisterVoid() {
             EventDispatch.AddEventListener("GameServ.Logic.ClientLogic","Login");
-            EventDispatch.AddEventListener("GameServ.Logic.ClientLogic","SendSuccess");
           
         }
         static void StartSoc() {

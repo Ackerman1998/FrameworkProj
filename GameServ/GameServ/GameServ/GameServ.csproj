@@ -55,12 +55,8 @@
     <Compile Include="Server\HttpServer.cs" />
     <Compile Include="Server\Room.cs" />
     <Compile Include="Server\SocServer.cs" />
-    <Compile Include="Test\MessageHandler.cs" />
-    <Compile Include="Utils\MessageNode.cs" />
-    <Compile Include="Utils\MessageQueue.cs" />
     <Compile Include="Utils\Bufferbyte.cs" />
     <Compile Include="Utils\EventDispatch.cs" />
-    <Compile Include="Utils\SendMessageQueue.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
