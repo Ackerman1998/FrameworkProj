@@ -8,7 +8,7 @@ namespace Framework {
 public class SignAssets 
 {
     //标记ab包
-    [MenuItem("Assets/SignAB")]
+    [MenuItem("Assets/快速标记")]
     public static void Abs()
     {
         MarkAB(GetSelectedPath());
@@ -24,7 +24,6 @@ public class SignAssets
                 return path;
             }
         }
-
         return path;
     }
     public static void MarkAB(string path,bool isFolder=false)
@@ -41,23 +40,18 @@ public class SignAssets
             }
             var ai = AssetImporter.GetAtPath(path);
             var dir = new DirectoryInfo(path);
-
-
             if (ai.assetBundleName == "" && ai.assetBundleVariant == "")
             {
                 ai.assetBundleName = dir.Name.Replace(".", "_");
                 ai.assetBundleVariant = "";
-                Debug.Log("Sign" + ai.assetBundleName + "Success");
+                Debug.Log("标记" + ai.assetBundleName + "成功");
             }
             else
             {
-                Debug.Log("Cancel Sign" + ai.assetBundleName);
+                Debug.Log("取消标记" + ai.assetBundleName);
                 ai.assetBundleVariant = "";
                 ai.assetBundleName = "";
-
-
             }
-
             AssetDatabase.RemoveUnusedAssetBundleNames();
         }
     }
@@ -69,10 +63,10 @@ public class SignAssets
         {
             Directory.CreateDirectory(directory);
         }
-        AssetBundleManifest assetBundleManifest = BuildPipeline.BuildAssetBundles(directory, BuildAssetBundleOptions.None, EditorUserBuildSettings.activeBuildTarget);
+        AssetBundleManifest assetBundleManifest = BuildPipeline.BuildAssetBundles(directory, BuildAssetBundleOptions.ChunkBasedCompression, EditorUserBuildSettings.activeBuildTarget);
         if (assetBundleManifest != null)
         {
-            Debug.Log("Pack Completed!Pack Directory：" + directory);
+            Debug.Log("打包成功,打包路径：" + directory);
         }
         // DirectoryInfo代表文件夹的一个类 可实例化 ,Directory 静态类 不可实例化
         DirectoryInfo directoryInfo = new DirectoryInfo(directory);
@@ -96,7 +90,14 @@ public class SignAssets
         {
             File.Delete(files[i].FullName);
         }
-        Debug.Log("Clear Completed!");
+        Debug.Log("清除成功!");
     }
 }
 }
+/*
+ BuildAssetBundleOptions(构建AssetBundle的方式)
+ None:默认方式,使用LZMA压缩，压缩包小，加载时间长
+ UncompressedAssetBundle:不压缩数据，包大，加载快
+ ChunkBaseCompression:LZ4压缩，压缩包比Node稍大，但加载时间快
+     
+     */

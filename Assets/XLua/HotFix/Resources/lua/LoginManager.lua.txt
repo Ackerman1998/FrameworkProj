@@ -1,0 +1,495 @@
+LoginManager={}
+local _headUrl;--服务器接口前缀
+local _thisID;--机器码
+local _studenturl;--学员码
+local GameObject = CS.UnityEngine.GameObject
+local WWW=CS.UnityEngine.WWW;
+local util = require 'xlua.util'
+local json= require "lua.json"
+local Http = CS.Http;--网络请求类
+local this = LoginManager;
+local _index=0;
+local _receiveUrl;--接收的url
+local ordernumber="ordernumber";
+local loadData;
+local codeImg;--二维码
+local _studentQRCode;--学员码UI
+local _curatorQRCode;--馆长码UI
+local _coachQRCode;--教员码UI
+local _dataInfo;
+local _studentQRCode_Group;--学员码显示/关闭动画
+local _authorizationQRCode_Group;--授权码显示/关闭动画
+local UnityWebRequest=CS.UnityEngine.Networking.UnityWebRequest
+local _Login_Group;--登录模块
+local _showLoginError;--错误显示面板
+local root;--ui root
+local ReceiveCor;--接收二维码的协程
+
+--在这里进行btn事件绑定
+function LoginManager.Awake()
+    root = GameObject.Find("LoginUI(Clone)");
+	root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/LoginGroup/Login_Btn"):GetComponent("Button").onClick:AddListener(function()
+		Login();
+	end
+	)
+	--_studentQRCode=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/SutdentQRCode_Group/StudentQR_CodeFloor/StudentQR_Code"):GetComponent("Image");
+	
+	_studentQRCode=this.self:GetGameObject("StudentQR_Code"):GetComponent("Image");
+	print("获取属性成功".._studentQRCode);
+	_coachQRCode=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/AuthorizationQRCode_Group/InstructorQR_CodeMask/InstructorQR_Code"):GetComponent("Image");
+	_curatorQRCode=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/AuthorizationQRCode_Group/CuratorQR_CodeMask/CuratorQR_Code"):GetComponent("Image");
+	_authorizationQRCode_Group=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/AuthorizationQRCode_Group"):GetComponent("Animator");
+	_studentQRCode_Group=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/SutdentQRCode_Group"):GetComponent("Animator");
+	_Login_Group=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/LoginGroup"):GetComponent("Animator");
+	root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/SutdentQRCode_Group/Close_Btn"):GetComponent("Button").onClick:AddListener(function()
+		
+		if (_index == 1)then
+            _studentQRCode_Group:Play("CloseGroup", 0);
+            _Login_Group:Play("ShowGroup", 0);
+        
+        else
+            _authorizationQRCode_Group:Play("CloseGroup", 0);
+            _Login_Group:Play("ShowGroup", 0);
+		end
+		this.self:StopCoroutine(HttpPost());	
+		this.self:StopCoroutine(ReceiveServer());	
+		this.self:StopAllCoroutines();	 
+	end);
+	_showLoginError=root.transform:Find("Field Main Menu UI/LoginErrorTips"):GetComponent("ShowLoginError");
+
+	print("初始化完成...");
+
+end
+
+function LoginManager.Start()
+    _headUrl = "https://aicar.carshow.com.cn/";
+	_thisID = CS.IniSetting.GetString("QR", CS.IniSetting.SectionName.Config, "");
+	print("当前机器码：" , _thisID);
+	local jsons = CS.IniSetting.FileRead("D:/Video/timeData.json");
+	print("log file =",jsons);
+	local logintime = CS.IniSetting.GetEndStatus(jsons);
+	--this.self:StartCoroutine(Test2(self));
+	print("lua log ",logintime);
+	--TestCoroutine
+	
+end
+
+--测试协程接口
+function Test2(show)
+	return util.cs_generator(function()
+		for i = 1,10 do
+			coroutine.yield(CS.UnityEngine.WaitForSeconds(3));
+			print("runtime i="..i)
+		end
+	end
+	)
+end
+
+--测试协程开启，关闭
+function TestCoroutine(callback)
+	return util.cs_generator(function()
+		coroutine.yield(CS.UnityEngine.WaitForSeconds(1));
+		callback();	
+	end
+	)
+end
+
+--点击准备就绪
+function Login()
+    local test =false
+	if (test) 
+	then
+		--测试版本
+		CS.UnityEngine.SceneManagement.SceneManager.LoadScene("Main UI");
+	else
+		--正式版本
+		_studenturl=_headUrl.."api/student/boot/requestcode?machine_code=".._thisID;
+		print("学员码:",_studenturl);
+		Upload();
+	end
+end
+--调用Unity中的方法时,静态方法一般直接用.调用，非静态方法用:调用
+--学员码Img接口:https://aicar.carshow.com.cn//uploads/code/student/2020-09-29/1601358693-999999.jpg
+--json格式
+--LUA: 发送成功,返回值：{"code":1,"msg":"成功","time":"1606098125",
+--"data":{"pay_code":"\/uploads\/code\/paycode\/2020-09-29\/1601358693-999999.jpg"}}
+--[[
+json解析：
+以Upload方法举例：
+从服务器得到Json类型的返回值text
+使用json.decode(text)解析出json对象loadData
+获取值：loadData.code , loadData.data.pay_code
+]]--
+-- 发送机器码并接收数据/二维码url
+function Upload()
+	this.self:StartCoroutine(HttpPost(_studenturl,_thisID,function(text)
+		--print("得到返回值"..text);
+		loadData = json.decode(text);
+		if (loadData.code == 1) then 
+			--请求成功
+			_index=1;
+			GetReceiveUrl();
+			SendServers();
+		else
+			--请求失败
+			_showLoginError:ShowErrorInfo("学员码请求失败:".._loadData.msg);
+			print("学员码url获取失败:".._loadData.msg);
+		end
+	end
+	,function(error)
+		--网络错误
+		_showLoginError:ShowErrorInfo("获取二维码请求失败,请检查网络连接");
+		print("获取学员码url接口请求失败，或是 网络错误:"..error);
+	end
+	))
+
+end
+
+--http get接口
+function HttpGet(url,CallBack)
+	return util.cs_generator(function()
+		local requestGet = UnityWebRequest.Get(url);
+		coroutine.yield(requestGet:SendWebRequest());
+		if(requestGet.isNetworkError or requestGet.isHttpError)then
+			print("Get接口网络错误"..requestGet.error);
+		else
+			CallBack(requestGet.downloadHandler.text);
+		end
+	end
+	)
+end
+
+
+--http Put/Post接口
+--url->服务器url，content->要put的内容,CallBack->回调,ErrorCall若出现错误,则调用显示错误面板
+function HttpPost(url,content,Callback,ErrorCall)
+	return util.cs_generator(function()
+		local requestPost=UnityWebRequest.Put(url,Http.GetBytes(content));
+		coroutine.yield(requestPost:SendWebRequest());
+		if(requestPost.error==null)then
+			local valueReturn = requestPost.downloadHandler.text;
+			--print("valueReturn="..valueReturn);
+			Callback(valueReturn);
+		else
+			ErrorCall(requestPost.error);
+			--print("HttpPost网络连接失败"..requestPost.error);
+		end
+		requestPost=nil;
+	end
+	)
+end
+
+--www接口请求二维码
+function WWWGetImg(url,content,CallBack,ErrorCall)
+	return util.cs_generator(function()
+		local www=WWW(url..content);
+		coroutine.yield(www);
+		if(www.isDone and www.error==null)then
+			local texture = www.texture;
+			CallBack(texture);
+		else
+			ErrorCall(www.error);
+			--print("WWWGetImg网络错误"..www.error);
+		end
+		www=nil;
+	end
+	)
+end
+
+--获取当前扫码信息的url接口
+function GetReceiveUrl()
+	if (_index==1) then
+		_receiveUrl=_headUrl.."api/student/boot/putmachine?machine_code=".._thisID
+	elseif (_index==2) then
+		_receiveUrl=""
+	elseif (_index==3) then
+		_receiveUrl=_headUrl.."api/curator/boot/putordernumber?ordernumber=".._dataInfo.data.ordernumber
+	end
+	print("GetReceiveUrl()--_receiveUrl: ".._receiveUrl)
+end
+
+--获取二维码并显示图片 1=学员二维码，3=教员码_studentQRCode _curatorQRCode _coachQRCode
+function SendServers()
+	if(_index==1) then
+		--获取学员码
+		if(loadData.data.student_code=="" or loadData.data.student_code==null)then
+			codeImg=loadData.data.pay_code;
+		else
+			codeImg=loadData.data.student_code;
+			
+		end
+		--向服务器发起请求
+		this.self:StartCoroutine(WWWGetImg(_headUrl,codeImg,function(texture)
+				local spriteStu = CS.UnityEngine.Sprite.Create(texture,CS.UnityEngine.Rect(0,0,texture.width,texture.height),CS.UnityEngine.Vector2(0.5,0.5));
+				_studentQRCode.sprite=spriteStu;
+				ReceiveCor= this.self:StartCoroutine(ReceiveServer());
+		end
+		,
+		function(error)
+			print("学员码Img接口请求失败："..error.."网络或者服务器错误");
+			_showLoginError:ShowErrorInfo("学员码获取失败.网络或服务器错误");
+		end
+		));
+	elseif(_index==3) then
+			print("获取馆长码");
+			--获取馆长码
+			this.self:StartCoroutine(WWWGetImg(_headUrl,loadData.data.curator_code,function(texture)
+				local spriteStu = CS.UnityEngine.Sprite.Create(texture,CS.UnityEngine.Rect(0,0,texture.width,texture.height),CS.UnityEngine.Vector2(0.5,0.5));
+				_curatorQRCode.sprite=spriteStu;
+				
+			end
+			,
+			function(error)
+				print("馆长码Img接口请求失败："..error.."网络或者服务器错误");
+				_showLoginError:ShowErrorInfo("馆长码获取失败.网络或服务器错误");
+			end
+			));
+			print("获取教员码");
+			--获取教员码
+			this.self:StartCoroutine(WWWGetImg(_headUrl,loadData.data.coach_code,function(texture)
+				local spriteStu = CS.UnityEngine.Sprite.Create(texture,CS.UnityEngine.Rect(0,0,texture.width,texture.height),CS.UnityEngine.Vector2(0.5,0.5));
+				_coachQRCode.sprite=spriteStu;
+		       
+			end
+			,
+			function(error)
+				print("教员码Img接口请求失败："..error.."网络或者服务器错误");
+				_showLoginError:ShowErrorInfo("教员码获取失败.网络或服务器错误");
+			end
+			));
+			_studentQRCode_Group:Play("CloseGroup", 0);
+            _authorizationQRCode_Group:Play("ShowGroup", 0);
+	end
+end
+
+local _ison=false;
+local _startOn=false;
+local _isShow=false;
+local _isCoach_boot_type;
+local _nowTime;--实时时间
+local _loginTime;--存储时间
+
+--获取用户、教员、馆长扫码信息 
+function ReceiveServer()	
+	return util.cs_generator(function()
+		 _ison=false;
+		 _startOn=false;
+		 _isShow=false;
+		 local i=0;
+		 while(_ison==false and i<240)
+		 do
+			coroutine.yield(CS.UnityEngine.WaitForSeconds(1));
+		
+			if (_index==1)then	
+			--local idData = CS.Http.GetBytes(_thisID);
+				
+			local studentCor=this.self:StartCoroutine(HttpPost(_receiveUrl,_thisID,function(text)
+					
+					if(_startOn==false)then
+						print("接口putmachine.学员扫码信息:"..text);
+						_dataInfo = json.decode(text);
+						if(_dataInfo.code==1)then
+							--CS.GlobalData.instance.Student = json.encode(text);
+							local globaldata = CS.GlobalData.instance;
+							globaldata:SetStudent(text);
+							globaldata:WriteJsonData2(text);
+							_startOn=true;
+							if(_dataInfo.data.coach_boot_type=="1")then
+								--学员再次上机
+								print("已授权,再次登录...");
+								_ison=true;
+								StartGetTime1();
+					
+							
+							
+							else
+								print("学员扫码成功,等待教员扫码...");
+								loadData.data.curator_code = _dataInfo.data.curator_code;
+								loadData.data.coach_code = _dataInfo.data.coach_code;
+								_index=3;
+								_isCoach_boot_type = false;
+								i=0;
+								GetReceiveUrl();
+								SendServers();
+							end
+						end
+					end
+				end
+				,
+				function(error)
+					print("学员扫码信息接口请求失败:".._receiveUrl.."错误信息："..error);
+					_showLoginError:ShowErrorInfo("网络异常，请检查网络");
+				end
+				));
+
+			elseif(_index==2)then
+				print("空值2");
+			elseif(_index==3)then
+				this.self:StartCoroutine(HttpGet(_receiveUrl,function(text)
+					print("教员扫码信息:"..text);
+					if(_isCoach_boot_type==false)then
+						local info = json.decode(text);
+						if(info.code==1)then
+							--授权成功
+							_ison=true;
+							_isCoach_boot_type=true;
+							print("首次上机");
+							_authorizationQRCode_Group:Play("CloseGroup", 0);
+							root.transform:Find("Field Main Menu UI/----------------------"):GetComponent("LuaRun"):CallLuaFunc("StartMode",2,1);
+							--CS.UnityEngine.SceneManagement.SceneManager.LoadScene("Main UI");
+						end
+					end
+				end
+				,
+				function(error)
+					print("教员码请求失败:"..error);
+					_showLoginError:ShowErrorInfo("网络异常，请检查网络");
+				end
+				))
+			end
+			i=i+1;
+		 end
+	end
+	)
+end
+
+function StartGetTime1()
+	local _nowTime = "123456";
+	_ison=true;
+	if(_dataInfo.data.order_first_status ~= 1 and  _dataInfo.data.endtime == "")then
+		_studentQRCode_Group:Play("CloseGroup", 0);
+		root.transform:Find("Field Main Menu UI/----------------------"):GetComponent("LuaRun"):CallLuaFunc("StartMode",2,1);
+	else
+		GetLoginTimer2();
+		_studentQRCode_Group:Play("CloseGroup", 0);
+		this.self:StartCoroutine(SendLoginTime2());
+
+	end
+
+end
+
+function GetLoginTimer2()
+    _loginTime=CS.LoginTime();
+	_loginTime.starttime = _nowTime;
+    _loginTime.endtime = _dataInfo.data.should_endtime;
+    _loginTime.ordernumber = _dataInfo.data.ordernumber;
+    _loginTime.should_endtime = _dataInfo.data.should_endtime;
+    _loginTime.phone = _dataInfo.data.phone;
+end
+
+--登陆成功后发送登陆时间2
+function SendLoginTime2()
+	return util.cs_generator(function()
+		print("SendLoginTime2接口:".._headUrl.."api/curator/boot/machine_start2?ordernumber=".._dataInfo.data.ordernumber);
+		local url = _headUrl.."api/curator/boot/machine_start2?ordernumber=".._dataInfo.data.ordernumber;
+		this.self:StartCoroutine(HttpGet(url,function(text)
+			local loginData = json.decode(text);
+			print("服务器接口SendLoginTime2返回:"..text);
+			if(loginData.code==1)then
+				print("服务器接口SendLoginTime2返回成功:"..text);
+				--CS.GlobalData.instance.Student=_dataInfo;
+				CS.GlobalData.instance:SetStudent(json.encode(_dataInfo));
+				_ison = true;
+				local jsons = CS.IniSetting.FileRead("D:/Video/timeData.json");
+				print("读取本地json数据:"..jsons);
+				local login_time =json.decode(jsons);
+				if(login_time.d_type==0 and login_time.ordernumber == _dataInfo.data.ordernumber)then
+					--未人脸登录，进行提示
+					print("未人脸登录，进行提示");
+					root.transform:Find("Field Main Menu UI/----------------------"):GetComponent("LuaRun"):CallLuaFunc("StartMode",2,1);
+					this.self:StopAllCoroutines();	 
+					
+					print("结束所有协程...");
+				else
+					--直接进入主界面
+					CS.UnityEngine.SceneManagement.SceneManager.LoadScene("Main UI");
+				end
+			else
+
+
+			end
+		end));
+
+	end)
+
+end
+
+--登陆成功后发送登陆时间1
+function SendLoginTime()
+
+		print("登陆成功后发送登陆时间:".._headUrl.."api/curator/boot/machine_start?ordernumber=".._dataInfo.data.ordernumber.."&starttime=".._loginTime.starttime);
+		local url =_headUrl.."api/curator/boot/machine_start?ordernumber=".._dataInfo.data.ordernumber.."&starttime=".._loginTime.starttime;
+		this.self:StartCoroutine(HttpGet(url,function(text)
+			local loginData = json.decode(text);
+		
+			if(loginData.code==1)then
+				local globaldata = CS.GlobalData.instance;
+				globaldata:WriteJsonData3(json.encode(_dataInfo),text);
+				print("machine_start登陆成功后发送登陆时间:"..text);
+				--globaldata.Student=_dataInfo;
+				CS.GlobalData.instance:SetStudent(json.encode(_dataInfo));
+				_ison = true;
+				
+				CS.UnityEngine.SceneManagement.SceneManager.LoadScene("Main UI");
+			else
+
+
+			end
+		end));
+
+	
+
+end
+
+--再次登录,发送登录时间
+function LoginManager.StartGetTime()
+	_nowTime="123456";
+	GetLoginTimer2();
+	SendLoginTime();
+end
+
+local cor =util.cs_generator(function()
+	print("Start coroutine...")
+	for i=1,10 do
+		coroutine.yield(CS.UnityEngine.WaitForSeconds(1))
+		print("cor log"..i)
+	end
+end
+
+)
+
+
+
+
+
+co2=coroutine.create(
+	function()
+		for i=1,10 do
+
+			if i==3 then
+			--print("i=3");
+				--print(coroutine.status(c02));
+				--print(coroutine.running);
+				
+			end
+			print("coroutine log :"..i);
+			--coroutine.yield();
+			--print("yield running ");
+		end
+	end
+)
+
+co=coroutine.create(
+	function(i)
+		print("lua coroutine :"..i);
+	end
+)
+
+
+function LoginManager.Destroy()
+
+end
+
+function LoginManager.Update()
+
+end

@@ -81,6 +81,7 @@ namespace Framework
         /// </summary>
         /// <param name="node"></param>
         public void AppendMessage(T node) {
+            Debug.Log("消息入队...");
             queue.Enqueue(node);
             if (isWait)
             {
@@ -91,6 +92,7 @@ namespace Framework
         }
         public void Start() {
             if (thread==null) {
+                Debug.Log("开启消息读取...");
                 queue = new ConcurrentQueue<T>();
                 thread = new Thread(Go);
                 thread.Start();
@@ -112,13 +114,11 @@ namespace Framework
     }
    
 }
-/*
- 数据处理类：
+/*数据处理类：
      开启线程处理接收到的数据
      使用Action异步执行处理数据的方法，若队列为空，则阻塞当前线程，不再读取数据。当有数据入队时
      停止线程堵塞，继续读取数据。这里我们用到EventWaitHandle来作为线程是否阻塞的信号
      EventWaitHandle使用：
      WaitOne()阻止当前线程，直到当前 System.Threading.WaitHandle 收到信号。
      Set()将事件状态设置为有信号，从而允许一个或多个等待线程继续执行。
-              
-     */
+*/

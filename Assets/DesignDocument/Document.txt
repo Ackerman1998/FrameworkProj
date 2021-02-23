@@ -1,10 +1,80 @@
-���ݹ��ܷ���
-�����ռ� ͳһFramework
+Framework根据功能分类
+命名空间 统一Framework
+待完成功能:AStar,网格合并,图集的打包与读取
 1.editor
     ...
 2.runtime
-    [1]Pack File(�ļ��������ȡ������) 
-		���ab��Ŀ���ļ��У������ɶ�Ӧconfig�ļ�����ȡ����ʱ����config�ļ�����ȡ���ء�
+    [1]Pack File(文件打包，读取，加载) 
+		打包ab到目标文件夹，并生成对应config文件，读取加载时根据config文件来读取加载。
 		
-	[2]Utils (���߰�)  
-		FFactory.cs ����ȡ��д��Ŀ���ļ������ݣ�1.������д�������д�����ļ�
+	[2]Utils (工具包)  
+		FFactory.cs （读取，写入目标文件夹内容）1.将你想写入的内容写入新文件
+
+3.xlua的使用以及流程:
+#配置
+导入xlua包到Asset，Tools到根目录
+打开PlayerSetting，在ScriptingDefineSymbols加入宏HOTFIX_ENABLE
+依次点击XLua->Generate Code->HotFix Inject in editor
+
+#使用LuaRun来运行lua代码
+加载策略
+Editor环境下：直接从Resources下加载Lua，或在AB包中加载Lua
+真机环境:从AB中加载
+在一个lua中调用其他lua：查找到lua挂载的gameobject，通过gameobject获取LuaRun，
+调用CallLuaFunc，给出对应的方法名，参数，该方法权限应为public
+
+#Version检查
+获取Version信息：得到一个versioncode，对比本地versioncode，
+一致：不进行下载，直接加载LoginUI进入
+若不一致：进行文件比对，从服务器获取服务器上的目标文件大小与本地文件的大小对比，
+若大小不同，加入下载队列，待所有文件对比完毕开始下载，进入下载时，在文件中写入
+一个标识downloadcode，表示正在下载，待所有文件下载完毕再将标识恢复默认值。
+
+#下载完成
+隐藏versioncheck的UI，加载新下载的ab中的UI.
+
+#断点续传下载
+当有新的版本时，下载文件前先删除该文件，再进行下载
+断点下载：获取服务器上文件的大小，再获取本地文件的大小，若本地文件大小小于服务器
+文件大小，则开始下载，使用HttpWebRequest请求要下载的文件，并设置要下载文件的起点，
+根据请求得到的响应获取文件流并装载到字符数组中，再将装在文件流的字符数组写入本地文件中。
+
+#开发期间遇到的问题:
+读取ab包运行lua时，存在一种情况：若想再运行ab包下另一lua文件。
+解决：将要运行的lua代码挂载到相对应的GameObject的LuaRun上，脚本执行完awake方法后将按Key-表名,Value-LuaRun添加到一个存储
+LuaRun的字典中，当需要的时候直接取出对应表名的LuaRun，通过LuaRun来调用另一lua中的代码。
+
+#Lua语法使用总结：暂无...
+
+4.AssetBundle
+#AssetBundle使用
+点击要打包的文件/文件夹的Inspector的AssetLabels,输入ab包的名字,后缀.命名好所有要打ab的包后
+使用BuildPipeline打AB包.
+BuildAssetBundleOptions(构建AssetBundle的方式)
+None:默认方式,使用LZMA压缩，压缩包小，加载时间长
+UncompressedAssetBundle:不压缩数据，包大，加载快
+ChunkBaseCompression:LZ4压缩，压缩包比Node稍大，但加载时间快
+#快速标记
+获取选中的文件或文件夹的路径，根据路径获取AssetImporter，并给其命名(小写)，加后缀。
+#Editor环境下不打AB包通过遍历AssetDataBase即可加载资源
+
+5.Socket双端
+Server:
+创建套接字绑定IP和Port建立Tcp连接
+异步开启接收客户端的请求，将接收到的客户端的Socket存储到容器中并实例化,在实例化出来的对象中
+单独对接收到的消息进行处理。
+#消息发送：
+消息格式：先发送括号内全部消息的长度，后发送(长度1+消息1+长度2+消息2)  例如：函数名+数据(Login+123+123)
+#消息接收处理：
+异步开启消息的接收，按规则先接收长度（Int），根据得到的长度再接收对应长度的消息,将收到的消息
+解析并添加到消息队列，开启一条线程来自动处理这些消息。通过函数名反射调用函数。
+#消息队列实现：
+开启线程处理消息，消息解析完成后，调用回调判断消息队列是否为空，若为空则堵塞当前线程，若不为空则递归
+调用处理消息的函数；当线程堵塞时，收到消息时消息入队，并解除线程堵塞，继续处理消息。
+#消息数据处理：
+通过反射调用方法（具体使用：EventDispatch.cs）
+1.注册：使用字典存储方法名和（包含类实例和类方法的对象），通过类名获取类并创建该类的实例，获取类的对应
+方法，将方法名，实例+方法以键值对的形式存入。
+2.调用：给定方法名和对应参数，遍历字典，若方法存在，则调用此方法。
+
+6.Shader：

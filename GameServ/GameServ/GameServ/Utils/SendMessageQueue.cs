@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,34 +13,27 @@ namespace GameServ.Utils
     /// 发送queue
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    class SendMessageQueue<T>
+    class SendMessageQueue<T> : MessageQueue<T>, IQueque<T>
     {
-        Thread thread = null;
-        bool isRunning = false;
-        bool isWait = false;
-
         delegate void CallBack();
-        private Queue<T> queue = null;
-     
         CallBack callBack;
-        EventWaitHandle eventWaitHandle = new AutoResetEvent(false);
         public SendMessageQueue() {
-
+            
         }
-        public void Start() {
+        public  void Start() {
       
             if (!isRunning) {
                 isRunning = true;
-                queue = new Queue<T>();
+                queue = new ConcurrentQueue<T>();
                 thread = new Thread(RunStart);
                 thread.Start();
                 callBack = new CallBack(DoRun);
                 RunStart();
-
+                
             }
         }
-        public void AppednMessage(T t) {
-            queue.Enqueue(t);
+        public  void AppendMessage(T node) {
+            queue.Enqueue(node);
             if (!isWait) {
                 eventWaitHandle.Set();
             }
@@ -57,14 +51,17 @@ namespace GameServ.Utils
             RunStart();
         }
         private void DoRun() {
-            
-            T t = queue.Dequeue() ;
-            if (t.GetType() == Type.GetType("GameServ.Utils.MessageNode"))
-            {
-                MessageNode node = t as MessageNode;
-                node.bufferbyte.SendMessage(node.client);
+            T t;
+            bool b  = queue.TryDequeue(out t) ;
+            if (b) {
+                if (t.GetType() == Type.GetType("GameServ.Utils.MessageNode"))
+                {
+                    MessageNode node = t as MessageNode;
+                    node.bufferbyte.SendMessage(node.client);
 
+                }
             }
+            
         }
     }
 }

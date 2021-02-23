@@ -1,0 +1,299 @@
+EndLoginManager={}
+local this=EndLoginManager;
+local _taobaoUrl;--淘宝网络接口
+local _suningUrl;--苏宁网络接口
+local _url;--正在使用的接口
+local _imgMask;
+local _time;
+local _timeTips;
+local _timeDataPath;--timeData.json路径
+local _seconds;
+local _isShow;
+local _index;
+local _errorIndex;
+local IO=CS.System.IO;
+local TimeSpan=CS.System.TimeSpan;
+local TimeZone=CS.System.TimeZone;
+local DateTime=CS.System.DateTime;
+local _loginTime;
+local IniSetting=CS.IniSetting;
+local SceneManager=CS.UnityEngine.SceneManagement.SceneManager;
+local UnityWebRequest=CS.UnityEngine.Networking.UnityWebRequest
+local Int64=CS.System.Int64;
+local util=require 'xlua.util';
+local _endtime;--结束时间
+local clicking=false;
+local _countDown;
+local _nowTime;
+--初始化一些属性
+function EndLoginManager.Awake()
+    if(SceneManager.GetActiveScene().name=="Main UI")then
+        _countDown=this.transform.parent.parent:Find("VideoAndFace/CountTime"):GetComponent("CountDown");
+
+    end
+    clicking=false;
+    _taobaoUrl = "http://api.m.taobao.com/rest/api3.do?api=mtop.common.getTimestamp";
+    _suningUrl = "http://quan.suning.com/getSysTime.do";
+    _url=_taobaoUrl;
+    _imgMask=this.transform:GetComponent("CanvasGroup");
+    _time=this.transform:Find("Seconds"):GetComponent("Text");
+    _timeTips=this.transform:Find("TimeTips").gameObject;
+    _timeDataPath="D:/Video/timeData.json";
+    _seconds=60;
+    _isShow=false;
+    _index=0;
+    _errorIndex=0;
+    InspectPath();
+    RenderJson();
+    StartUpdateTime();
+end
+--获取剩余时间
+function StartUpdateTime()
+    if(_loginTime==nil)then
+
+    else
+        GetTime();
+    end
+
+end
+--[[
+淘宝接口数据示例：
+{"api":"mtop.common.getTimestamp","v":"*","ret":["SUCCESS::接口调用成功"],"data":{"t":"1608013414927"}}
+苏宁接口数据示例：
+{"sysTime2":"2020-12-15 14:24:36","sysTime1":"20201215142436"}
+]]--
+--获取网络时间
+function GetTime()
+   this.self:StartCoroutine(HttpGet(_url,function(error)
+        --失败回调
+        print("网络请求失败网络接口".._url.."访问失败:"..error);
+        if(SceneManager.GetActiveScene().name=="Main UI")then
+            --MainUI
+            _time.text = "网络连接超时,请检查网络连接";
+            coroutine.yield(CS.UnityEngine.WaitForSeconds(1));
+            GetTime();
+        else
+            --科二/科三
+            if(_index >= 60 and _url == _taobaoUrl)then
+                _url=_suningUrl;
+                _index=0;
+                print("淘宝接口异常访问失败,切换网络接口：".._url);
+                coroutine.yield(CS.UnityEngine.WaitForSeconds(1));
+                GetTime();
+            elseif(_index >= 60 and _url == _suningUrl)then
+                print("网络连接超时,返回主界面");
+                SceneManager.LoadScene("Main UI");
+            else
+                _index=_index+1;
+                coroutine.yield(CS.UnityEngine.WaitForSeconds(1));
+                print("网络接口".._url.."访问失败次数:".._index);
+                _time.text = "网络连接超时,正在尝试重新连接:" + _index;
+                GetTime();
+            end
+        end
+   end,
+   function(callbackText)
+        --成功回调
+
+        if(_url==_taobaoUrl)then
+            --淘宝接口
+            print("淘宝接口回调成功，获得的数据:"..callbackText);
+            local root = IniSetting.GetRoots(callbackText);
+            if(root.data.t==nil or root.data.t=="" )then
+                if(_errorIndex>=20 and _url==_taobaoUrl)then
+                    _url=_suningUrl;
+                    _errorIndex=0;
+                    print("网络接口数据异常,切换接口:".._url);
+                    GetTime();
+                else
+                    _errorIndex=_errorIndex+1;
+                    coroutine.yield(CS.UnityEngine.WaitForSeconds(1));
+                    print("网络时间接口".._url.."接口不存在,次数：".._errorIndex);
+                    _time.text = "网络数据异常,正在尝试重新获取:".._errorIndex;
+                    GetTime();
+                end              
+            else
+                print("root.data.t:"..root.data.t);
+                --local timeStr=root.data.t:Substring(0,#(root.data.t)-3);
+                local timeStr=string.sub(root.data.t,0,#(root.data.t)-3);
+                print("timeStr="..timeStr);
+                print("网络时间接口数据："..callbackText.."时间戳："..timeStr);
+                local _long;
+                local time = DateTime.MinValue;
+                _long=Int64.Parse(timeStr);
+                if(_long==0)then
+                    if(_errorIndex>=120 and _url == _taobaoUrl)then
+                        _url=_suningUrl;
+                        _errorIndex=0;
+                        print("网络接口数据异常，切换接口：".._url);
+                        GetTime();
+                    else
+                        _errorIndex=_errorIndex+1;
+                        coroutine.yield(CS.UnityEngine.WaitForSeconds(1));
+                        print("网络时间接口".._url.."接口不存在,次数：".._errorIndex);
+                        _time.text = "网络数据异常,正在尝试重新获取:".._errorIndex;
+                        GetTime();
+                    end
+                else
+                    
+                    local dtStart=TimeZone.CurrentTimeZone:ToLocalTime(DateTime(1970,1,1));
+                    local lTime=Int64.Parse(_long.."0000000");
+             
+                    local toNow=TimeSpan(lTime);
+                    local dtResult=dtStart:Add(toNow);
+                    _nowTime=dtResult;
+                    print("淘宝接口成功获取网络时间：".._nowTime:ToString());
+                    _index=0;
+                    _errorIndex=0;
+                    UpdataTime();
+                end
+            end
+        elseif(_url==_suningUrl)then
+            --苏宁接口
+            print("苏宁接口回调成功，获得的数据:"..callbackText);
+            local root = IniSetting.GetSuNing(callbackText);
+            if(root.sysTime2==nil or root.sysTime2=="" )then
+                if(_errorIndex>=60)then
+                    print("网络接口数据异常,切换接口:".._url);
+                    SceneManager.LoadScene("Main UI");
+                else
+                    _errorIndex=_errorIndex+1;
+                    coroutine.yield(CS.UnityEngine.WaitForSeconds(1));
+                    print("网络时间接口".._url.."接口失败,次数：".._errorIndex);
+                    _time.text = "网络数据异常,正在尝试重新获取:".._errorIndex;
+                    GetTime();
+                end              
+            else
+               _nowTime=CS.System.Convert.ToDateTime(root.sysTime2);
+               _index=0;
+               if(_nowTime==nil)then
+                    Debug.Log("苏宁接口数据错误");
+                    if(_index>=60)then
+                        SceneManager.LoadScene("Main UI");
+                    else
+                        _index=_index+1;
+                        print("网络时间接口".._url.."接口不存在,次数：".._index);
+                        _time.text = "网络连接超时,正在尝试重新连接:".._index;
+                        GetTime();
+                    end
+               else
+                    print("苏宁接口成功获取网络时间：".._nowTime);
+                    UpdataTime();
+               end
+            end
+
+
+        end
+   end
+))
+end
+--获取网络时间成功，回调返回给客户端
+function UpdataTime()
+    _endtime=_loginTime.should_endtime;
+    local timeStamp=_endtime;
+    local dtStart=TimeZone.CurrentTimeZone:ToLocalTime(DateTime(1970,1,1));
+    local lTime=Int64.Parse(timeStamp.."0000000");
+    local toNow=TimeSpan(lTime);
+    local dtResult=dtStart:Add(toNow);
+    local span=dtResult-_nowTime;
+    print("更新网络时间");
+    local h = CS.UnityEngine.Mathf.FloorToInt(span.TotalSeconds/3600);
+    local m = CS.UnityEngine.Mathf.FloorToInt(span.TotalSeconds / 60 - h * 60);
+    m=(h*60)+m;--???
+    _time.text="剩余时间:"..math.ceil(m+1).."分钟";
+    print("span.TotalSeconds="..span.TotalSeconds);
+    if(CS.System.Math.Floor(span.TotalSeconds) <= 120 and CS.System.Math.Floor(span.TotalSeconds) > 0)then
+        _seconds = 1;
+        if (_isShow==false)then
+        
+           
+            _time.color =CS.UnityEngine.Color32(203, 64, 64, 255);
+            _isShow = true;
+        end
+        if (_timeTips.activeSelf==false)then
+        
+            _timeTips:SetActive(true);
+        end
+    elseif(CS.System.Math.Floor(span.TotalSeconds) <= 0)then
+        print("学时结束,执行强制登出");
+        if (SceneManager.GetActiveScene().name.Contains("Main UI"))then
+        
+            print("强制登出");
+           
+            local exitToSystem = CS.UnityEngine.GameObject.FindObjectOfType("ExitToSystem");
+            if(_countDown._status==2)then
+            
+            else
+                exitToSystem:ExitRead_A();
+            end
+        else
+        
+            CS.GlobalData.instance:WriteEndJsonData(1);
+            print("强制登出,返回主界面");
+            AsyncLoadScene();
+        end
+    end
+    print("更新时间成功,等待六十秒...");
+    coroutine.yield(CS.UnityEngine.WaitForSeconds(60));
+
+    StartUpdateTime();
+end
+
+function AsyncLoadScene()
+    if(clicking)then
+
+    else
+        clicking=true;
+        SceneManager.LoadScene("Main UI");
+    end
+end
+
+--Get接口
+function HttpGet(url,ErrorCall,CallBack)
+	return util.cs_generator(function()
+		local requestGet = UnityWebRequest.Get(url);
+		coroutine.yield(requestGet:SendWebRequest());
+		if(requestGet.isNetworkError or requestGet.isHttpError)then
+            print("Get接口网络错误"..requestGet.error);
+            ErrorCall(requestGet.error);
+		else
+			CallBack(requestGet.downloadHandler.text);
+		end
+	end
+	)
+end
+
+--预加载路径,是否存在不存在则创建
+function InspectPath()
+    print("-----------------创建-----------------");
+    local userFile = IO.FileInfo(_timeDataPath);
+    print(userFile.Exists);
+    if(userFile.Exists==false)then
+        local fs=userFile:Create();
+        fs:Close();
+    end
+end
+--读取数据
+function RenderJson()
+    local userData=IO.File.ReadAllText(_timeDataPath);
+    print(userData);
+    if(userData==nil or userData.Length==0)then
+
+    else
+        print("获取JsonMapper");      
+        _loginTime =IniSetting.GetLoginTime(userData);      
+        print("-----------------读取JsonData数据成功-----------------");
+    end
+end
+
+function EndLoginManager.Start()
+
+end
+
+function EndLoginManager.Update()
+
+end
+
+function EndLoginManager.Destroy()
+
+end

@@ -1,0 +1,7 @@
+test2={}
+
+function test2.Run()
+    print("run运行...");
+    
+end
+return test2;

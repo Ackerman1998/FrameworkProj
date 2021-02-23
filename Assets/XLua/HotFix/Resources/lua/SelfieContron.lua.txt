@@ -1,0 +1,346 @@
+SelfieContron={};
+local GameObject = CS.UnityEngine.GameObject
+local UnityEngine = CS.UnityEngine;
+local WWW=CS.UnityEngine.WWW;
+local Http = CS.Http;--网络请求类
+local UnityWebRequest=CS.UnityEngine.Networking.UnityWebRequest
+local this = SelfieContron;
+--json解析工具,协程
+local util = require 'xlua.util'
+local json= require "lua.json"
+local _showLoginError;--错误显示面板
+local Ison=false;
+local DeviceName;--不必填写 自动获取摄像头名称
+local Tex;--摄像头捕获的图片
+local DeviceData;--视频显示区域的图片
+local _isLogin;
+local LoginType_m;
+local moduleEntry;--模块入口动画
+local _loginGroup;
+local BText;--确认拍照
+local _floor_Color;-- 边框颜色
+local _close_Btn;--关闭
+local startPhoto;--开始拍照
+local _select_Module;--模块选择入口
+local detectionCam;--未检测到相机
+local _skip_Text;--跳过文本
+local _des_Lab;--描述内容
+local _skipTips_Text;--跳过二次确认提示文本
+local _affirm_Btn;--确认拍照按钮
+local DeviceData_B;
+local _saveRawImage;--发送的图片
+local strbaser64;
+local _skip_Btn;
+local _subjectType;--科目类型
+local root;--登录UI的根节点LoginUI(Clone)
+function SelfieContron.Awake()
+    --初始化一些UI组件
+    root = GameObject.Find("LoginUI(Clone)");
+	_showLoginError=root.transform:Find("Field Main Menu UI/LoginErrorTips"):GetComponent("ShowLoginError");
+	DeviceData=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/Start_Module/Image (3)/RawImage"):GetComponent("RawImage");
+    moduleEntry=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group"):GetComponent("Animator");
+    _loginGroup=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/LoginGroup"):GetComponent("Animator");
+    BText=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/Start_Module/Affirm_Btn/Img/Text"):GetComponent("Text");
+
+    _floor_Color=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/Start_Module/Floor_Color"):GetComponent("Image");
+    _close_Btn=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/Close_Btn"):GetComponent("Button");
+
+    startPhoto=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/Start_Module").gameObject;
+    _select_Module=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/Select_Module").gameObject;
+    detectionCam=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/Undetected_Module").gameObject;
+
+    _skip_Text=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/Skip_Btn/Text"):GetComponent("Text");
+    _des_Lab=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/Start_Module/Des_Lab"):GetComponent("Text");
+    _skipTips_Text=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/SkipTips_Module/Tips_Animator/Des_Text"):GetComponent("Text");
+    _affirm_Btn=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/Start_Module/Affirm_Btn"):GetComponent("Button");
+    DeviceData_B=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/Start_Module/DeviceData_B"):GetComponent("Image");
+    _saveRawImage=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/Start_Module/Image (3)/SaveRawImage"):GetComponent("Image");
+    _skip_Btn=root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/SkipTips_Module/Tips_Animator/Yes_Btn"):GetComponent("Button");
+    root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/Select_Module/Subject2_Btn"):GetComponent("Button").onClick:AddListener(function()
+		OnStart(2);
+	end
+    )
+    root.transform:Find("Field Main Menu UI/LoginUI/Animator_Gorup/FaceRecognition_Group/Select_Module/Subject3_Btn"):GetComponent("Button").onClick:AddListener(function()
+		OnStart(3);
+	end
+	)
+    this.self:StartCoroutine(OpenCamDevice());
+    _subjectType=2;
+ 
+end
+
+--打开摄像头
+function OpenCamDevice()
+    return util.cs_generator(function()
+        print("coroutine.yield(CS.UnityEngine.starting");
+        if(Ison==true)then
+            print("coroutine.yield(CS.UnityEngine.WaitForSeconds(0));");
+            coroutine.yield(CS.UnityEngine.WaitForSeconds(0));
+        else
+            --等待用户允许访问
+            coroutine.yield(UnityEngine.Application.RequestUserAuthorization(UnityEngine.UserAuthorization.WebCam));
+            if(UnityEngine.Application.HasUserAuthorization(UnityEngine.UserAuthorization.WebCam))then
+                --先获取设备
+                local devices = UnityEngine.WebCamTexture.devices;
+                print("检测到相机的数量是"..devices.Length);
+                if(devices.Length~=0)then
+                   DeviceName=devices[0].name;
+                   print("camera name ="..DeviceName);
+                   Tex=UnityEngine.WebCamTexture(DeviceName,1280,720,12);
+                   DeviceData.texture=Tex;
+                   Tex:Play();
+                    print("摄像头开启"..DeviceData.texture.name);
+                    Ison=true;
+                else
+                    Ison=false;
+                    print("没检测到摄像头");
+                end
+            end
+        end
+    end
+    )
+end
+
+--人脸选择入口，2-科目二，3-科目三
+function OnStart(num)
+    _subjectType=num;
+    this.self:StartCoroutine(OpenCamDevice());
+    if(Ison)then
+        --开始拍照
+        print("人脸选择科目"..num.."入口");
+        print("detectionCam.name="..detectionCam.name);
+        detectionCam:SetActive(false);
+        _select_Module:SetActive(false);
+        startPhoto:SetActive(true);
+    else
+        --未检测到摄像头
+        detectionCam:SetActive(true);
+        _select_Module:SetActive(false);
+        startPhoto:SetActive(false);
+    end
+end
+
+--人脸登入2或者登出 4
+function SelfieContron.StartMode(i,isLogin)
+    print("进入人脸方法StartMode");
+    _isLogin=isLogin;
+    LoginType_m=i;
+   
+    --CS.GlobalData.instance.Student==nil or CS.GlobalData.instance.Student.data.sim==nil or CS.GlobalData.instance.Student.data.sim == ""
+    local globalData=CS.GlobalData.instance;
+   -- print("GetSim():"..globalData:GetSim());
+    if(globalData.Student==nil or globalData.Student.data.sim==nil or globalData.Student.data.sim == "")then
+        _showLoginError:ShowErrorInfo("模拟器无有Sim值.请联系管理员");
+        if(_isLogin==1)then
+            print("无有Sim值首次登录"..isLogin);
+            root.transform:Find("Field Main Menu UI/Menu Manager"):GetComponent("LuaRun"):CallLuaFunc("StartGetTime");
+            --  _loginManager.StartGetTime();
+        elseif(i==2)then
+            print("无有Sim值进入主界面"..i);
+            CS.UnityEngine.SceneManagement.SceneManager.LoadScene("Main UI");
+        else
+            print("无有Sim值进入登录界面"..i);
+        end
+    else
+        moduleEntry:Play("ShowGroup", 0);
+        _loginGroup:Play("CloseGroup", 0);
+        --print("hhhhhhhh");
+        BText.text = "确认拍照";
+        --print("hhhhhhhh2");
+        _floor_Color.color = UnityEngine.Color32(233, 233, 233, 255);
+        _close_Btn.onClick:RemoveAllListeners();
+        _close_Btn.onClick:AddListener(function()
+        
+            CloeSelfieMoudle();
+        end);
+        if(i==2)then
+            print("进入人脸登入模块");
+            _skip_Text.text = "跳过直接进入";
+            _des_Lab.text = "要进行人脸识别，在开始之前请摘下眼镜，帽子等头部装饰物。";
+            _skipTips_Text.text = "是否确定跳过扫脸，直接进入程序";
+            moduleEntry.transform:Find("Select_Module/Title_Text"):GetComponent("Text").text = "人脸识别登陆模块";
+
+            _skip_Btn.onClick:RemoveAllListeners();
+
+            _skip_Btn.onClick:AddListener(function()
+            
+
+                print("手动点击跳过人脸登入模块");
+                OnStop();
+                -- 跳过人脸登出计时,执行下一步学习记录选择页面计时
+                -- _countDown.ResetTimer(0, 2);
+            end
+            );
+            _affirm_Btn.onClick:RemoveAllListeners();
+            _affirm_Btn.onClick:AddListener(function()
+            
+                OnUploadPlatform(2);
+            end);
+        else 
+            print("进入人脸登入模块");
+            _skip_Text.text = "跳过直接退出";
+            _des_Lab.text = "再次要进行人脸识别退出登录，在开始之前请摘下眼镜，帽子等头部装饰物。";
+            _skipTips_Text.text = "是否确定跳过扫脸，直接进入程序";
+            moduleEntry.transform:Find("Select_Module/Title_Text"):GetComponent("Text").text = "人脸识别登出模块";
+
+            _skip_Btn.onClick:RemoveAllListeners();
+
+            _skip_Btn.onClick:AddListener(function()
+            
+
+                print("手动点击跳过人脸登出模块");
+                OnStop();
+                -- 跳过人脸登出计时,执行下一步学习记录选择页面计时
+                -- _countDown.ResetTimer(0, 2);
+            end
+            );
+            _affirm_Btn.onClick:RemoveAllListeners();
+            _affirm_Btn.onClick:AddListener(function()
+            
+                OnUploadPlatform(2);
+            end);
+        end
+    end
+
+end
+--停止硬件相机
+function OnStop()
+    if(Ison==false)then
+        print("没有检测到摄像头");
+        if(_isLogin==1)then
+            print("没有检测到摄像头关闭人脸识别界面.开始StartTime");
+            root.transform:Find("Field Main Menu UI/Menu Manager"):GetComponent("LuaRun"):CallLuaFunc("StartGetTime");
+            --_loginManager.StartGetTime();
+        elseif(LoginType_m==2)then
+            print("没有检测到摄像头关闭人脸识别界面进入主界面");
+            CS.UnityEngine.SceneManagement.SceneManager.LoadScene("Main UI");
+        elseif(LoginType_m==4)then
+            print("没有检测到摄像头关闭人脸登出界面，进入提交记录");
+            detectionCam:SetActive(false);
+            startPhoto:SetActive(false);
+            _select_Module:SetActive(false);
+            CS.GlobalData.instance:WriteEndJsonData(0);
+            CS.UnityEngine.SceneManagement.SceneManager.LoadScene("Login");
+        end
+    else
+        if (_isLogin == 1)then
+            print("关闭人脸识别界面.开始StartTime");
+            root.transform:Find("Field Main Menu UI/Menu Manager"):GetComponent("LuaRun"):CallLuaFunc("StartGetTime");
+            --_loginManager.StartGetTime();
+        elseif (LoginType_m == 2)then
+            print("跳过人脸识别界面进入主界面");
+            CS.UnityEngine.SceneManagement.SceneManager.LoadScene("Main UI");
+        elseif (LoginType_m == 4)then
+            _select_Module:SetActive(false);
+            startPhoto:SetActive(false);
+            print("跳过人脸登出界面，进行提交记录");
+            CS.GlobalData.instance:WriteEndJsonData(0);
+            CS.UnityEngine.SceneManagement.SceneManager.LoadScene("Login");
+        end
+    end
+end
+
+--2是学员登陆 ,4是学员登出
+function OnUploadPlatform(LoginType)
+    print("LoginType:"..LoginType);
+    OnScreenshot();
+
+
+    if (DeviceData_B.sprite.name.Length >= 1)
+    then
+        print("图片异常,非内存图片"..DeviceData_B.sprite.name);
+
+        
+    else
+        this.self:StartCoroutine(ToPlatform(LoginType));
+    end
+
+end
+
+--发送车管所
+function ToPlatform()
+    return util.cs_generator(function()
+        local http="https://szjpxc.szsfm.com/api/services/szsfm/face/LogInOut?key=9083b90546ff4250";
+        if(CS.GlobalData.instance.Student.data.idcard=="" or CS.GlobalData.instance.Student.data.sim=="")then
+            local json1=CS.IniSetting.FileRead("D:/Video/timeData.json");
+            local info =CS.GlobalData.instance:ReadJsonData();
+            CS.GlobalData.instance.Student=info;
+            print("人脸登录登出，获取本地数据"..json1);
+        end
+        local temp=CS.Tempdata();
+        temp.Sim = CS.GlobalData.instance.Student.data.sim;
+        temp.ClassType = _subjectType;
+        temp.LoginType = loginType;
+        temp.Idcard = CS.GlobalData.instance.Student.data.idcard;
+        temp.imgData.ImgType = 1;
+        temp.imgData.ImgContent = strbaser64;
+        local json = json.encode();
+        print("发给车管所数据"..json);
+    end
+    )
+end
+
+--保存截图
+function OnScreenshot()
+    if(Ison==false)then
+        print("没有检测到摄像头");
+    else
+        if(Tex.isPlaying)then
+            Save1(Tex);
+        else
+            print("相机不在工作中");     
+            print("重新启动摄像头");
+            Reset();
+        end
+    end
+end
+
+function Reset()
+    Ison=false;
+    this.self:StartCoroutine(OpenCamDevice());
+end
+
+
+
+function Save1(webCamTex)
+    local t2d = UnityEngine.Texture2D(540, webCamTex.height, UnityEngine.TextureFormat.ARGB32, true);
+    t2d:SetPixels(t:GetPixels(370, 0, 540, t2d.height));
+    t2d:Apply();
+    DeviceData_B.sprite = UnityEngine.Sprite.Create(t2d, CS.UnityEngine.Rect(0, 0, t2d.width, t2d.height), UnityEngine.Vector2(0.5, 0.5));
+    local temp = DeviceData_B.sprite.texture;
+    this.self:StartCoroutine(saveTexture2DtoFile(temp, "I:\11.png"));
+    _saveRawImage.texture = temp;
+    local imageTytes=temp.EncodeToJPG();
+    strbaser64=Http.ToBase64String(imageTytes);
+end
+
+function saveTexture2DtoFile(texture,path)
+    return util.cs_generator(function()
+        coroutine.yield(UnityEngine.WaitForEndOfFrame());
+        local textureData = texture.EncodeToJPG();
+        CS.Http.WriteBytes(path,textureData);
+        print("图片文件写入完毕"..path);
+    end
+    )
+end
+
+--关闭人脸界面
+function CloeSelfieMoudle()
+    startPhoto:SetActive(false);
+    _select_Module:SetActive(true);
+    detectionCam:SetActive(false);
+    moduleEntry:Play("CloseGroup");
+    _loginGroup:Play("ShowGroup");
+end
+
+function SelfieContron.Start()
+
+end
+
+function SelfieContron.Update()
+
+end
+
+function SelfieContron.Destroy()
+
+end

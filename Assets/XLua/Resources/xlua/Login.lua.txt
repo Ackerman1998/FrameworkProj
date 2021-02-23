@@ -1,0 +1,23 @@
+--lua模板(一键生成代码用)
+Login={}
+local this =Login;
+local GameObject = CS.UnityEngine.GameObject;
+local UnityEngine = CS.UnityEngine;
+local util = require 'xlua.util';
+function Login.Awake()
+
+end
+
+function Login.Start()
+
+end
+
+function Login.Update()
+
+end
+
+function Login.Destroy()
+
+end
+
+

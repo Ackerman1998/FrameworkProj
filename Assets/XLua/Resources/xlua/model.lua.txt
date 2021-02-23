@@ -1,0 +1,23 @@
+--lua模板(一键生成代码用)
+model={}
+local this =model;
+local GameObject = CS.UnityEngine.GameObject;
+local UnityEngine = CS.UnityEngine;
+local util = require 'xlua.util';
+function model.Awake()
+
+end
+
+function model.Start()
+
+end
+
+function model.Update()
+
+end
+
+function model.Destroy()
+
+end
+
+

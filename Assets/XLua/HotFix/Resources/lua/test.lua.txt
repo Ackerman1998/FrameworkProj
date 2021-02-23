@@ -1,0 +1,9 @@
+test={}
+--读取test2.lua,
+function test.Awake()
+    print("这是awake方法");
+    -- local ab = CS.UnityEngine.AssetBundle.LoadFromFile(CS.UnityEngine.Application.streamingAssetsPath.."/lua");
+    -- local test2 = ab:LoadAsset("test2.lua");
+    -- print("读取test2:"..test2.text);
+    CS.UnityEngine.GameObject.Find("test2"):GetComponent("LuaRun"):CallLuaFunc("Run");
+end

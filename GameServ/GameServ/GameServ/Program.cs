@@ -10,10 +10,97 @@ using System.Threading;
 using System.Threading.Tasks;
 using LitJson;
 using GameServ.Utils;
+using GameServ.Test;
+using System.Text.RegularExpressions;
+using System.Security.Cryptography;
 namespace GameServ
 {
     class Program
     {
+        static byte[] EncryptStringToBytes_Aes(string plainText, byte[] Key, byte[] IV)
+        {
+            // Check arguments.
+            if (plainText == null || plainText.Length <= 0)
+                throw new ArgumentNullException("plainText");
+            if (Key == null || Key.Length <= 0)
+                throw new ArgumentNullException("Key");
+            if (IV == null || IV.Length <= 0)
+                throw new ArgumentNullException("IV");
+            byte[] encrypted;
+
+            // Create an Aes object
+            // with the specified key and IV.
+            using (Aes aesAlg = Aes.Create())
+            {
+                aesAlg.Key = Key;
+                aesAlg.IV = IV;
+
+                // Create an encryptor to perform the stream transform.
+                ICryptoTransform encryptor = aesAlg.CreateEncryptor(aesAlg.Key, aesAlg.IV);
+
+                // Create the streams used for encryption.
+                using (MemoryStream msEncrypt = new MemoryStream())
+                {
+                    using (CryptoStream csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write))
+                    {
+                        using (StreamWriter swEncrypt = new StreamWriter(csEncrypt))
+                        {
+                            //Write all data to the stream.
+                            swEncrypt.Write(plainText);
+                        }
+                        encrypted = msEncrypt.ToArray();
+                    }
+                }
+            }
+
+            // Return the encrypted bytes from the memory stream.
+            return encrypted;
+        }
+
+        static string DecryptStringFromBytes_Aes(byte[] cipherText, byte[] Key, byte[] IV)
+        {
+            // Check arguments.
+            if (cipherText == null || cipherText.Length <= 0)
+                throw new ArgumentNullException("cipherText");
+            if (Key == null || Key.Length <= 0)
+                throw new ArgumentNullException("Key");
+            if (IV == null || IV.Length <= 0)
+                throw new ArgumentNullException("IV");
+
+            // Declare the string used to hold
+            // the decrypted text.
+            string plaintext = null;
+
+            // Create an Aes object
+            // with the specified key and IV.
+            using (Aes aesAlg = Aes.Create())
+            {
+                aesAlg.Key = Key;
+                aesAlg.IV = IV;
+
+                // Create a decryptor to perform the stream transform.
+                ICryptoTransform decryptor = aesAlg.CreateDecryptor(aesAlg.Key, aesAlg.IV);
+
+                // Create the streams used for decryption.
+                using (MemoryStream msDecrypt = new MemoryStream(cipherText))
+                {
+                    using (CryptoStream csDecrypt = new CryptoStream(msDecrypt, decryptor, CryptoStreamMode.Read))
+                    {
+                        using (StreamReader srDecrypt = new StreamReader(csDecrypt))
+                        {
+
+                            // Read the decrypted bytes from the decrypting stream
+                            // and place them in a string.
+                            plaintext = srDecrypt.ReadToEnd();
+                        }
+                    }
+                }
+            }
+
+            return plaintext;
+        }
+
+        #region test void
         /// <summary>
         /// TcpClient
         /// </summary>
@@ -48,18 +135,135 @@ namespace GameServ
         //    string recv_str = Encoding.UTF8.GetString(receive_buffer);
         //    Console.WriteLine("接收消息：" + recv_str);
         //}
-
+        #endregion
         static Socket _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);  //侦听socket
         static void Main(string[] args)
         {
+            #region test code
+            //test Messagequeue
+
+            //MessageQueue<string> message = new MessageQueue<string>();
+            //message.Start();
+            //Console.WriteLine("5秒后开启线程1，2...");
+            //Thread.Sleep(5000);
+            //new Thread(() =>
+            //{
+            //    for (int i = 0; i < 100; i++)
+            //    {
+            //        Thread.Sleep(100);
+            //        message.AppendMessage("test void1 " + i);
+            //    }
+
+            //}).Start();
+            //new Thread(() =>
+            //{
+            //    for (int i = 0; i < 100; i++)
+            //    {
+            //        Thread.Sleep(200);
+            //        message.AppendMessage("test void2 " + i);
+            //    }
+
+            //}).Start();
+            //for (int i = 0; i < 100; i++)
+            //{
+            //    message.AppendMessage("test void2 " + i);
+            //}
+            //MessageHandler message = new MessageHandler();
+            //message.Start();
+            //for (int i=0;i<100;i++) {
+            //    message.AppendMessage("test void " + i);
+            //}
+            //while (true) {
+            //    Console.WriteLine("请输入一个邮箱");
+            //    string email = Console.ReadLine();
+            //    Regex regex = new Regex(@"^(\w)+(\.\w)*@(\w)+((\.\w+)+)$");
+            //    if (regex.IsMatch(email))
+            //    {
+            //        Console.WriteLine("邮箱格式正确。");
+            //    }
+            //    else
+            //    {
+            //        Console.WriteLine("邮箱格式不正确。");
+            //    }
+            //}
+            #endregion
+
+            #region Net 
             RegisterVoid();//注册一些方法
-           // Console.WriteLine("http start...");
-            GameServ.Server.SocServer hs = new Server.SocServer("127.0.0.1",8081);
+            GameServ.Server.SocServer hs = new Server.SocServer("127.0.0.1", 8081);
             hs.StartAccept();
+            #endregion
+
+            #region code Security
+            byte [] b= AESEncrypt.Encrypt(Encoding.UTF8.GetBytes("Here is some data to encrypt!"), "abcdef0123456789abcdef0123456789", "0000000000000000");
+            AESEncrypt.Decrypt(b, "abcdef0123456789abcdef0123456789", "0000000000000000");
+            //TestSecurity("Here is some data to encrypt!");
+            //TestSecurity("Here is some data to encrypt!");
+            //string original = "Here is some data to encrypt!";
+
+            //// Create a new instance of the Aes
+            //// class.  This generates a new key and initialization
+            //// vector (IV).
+            //using (Aes myAes = Aes.Create())
+            //{
+
+            //    // Encrypt the string to an array of bytes.
+            //    byte[] encrypted = EncryptStringToBytes_Aes(original, myAes.Key, myAes.IV);
+
+            //    // Decrypt the bytes to a string.
+            //    string roundtrip = DecryptStringFromBytes_Aes(encrypted, myAes.Key, myAes.IV);
+
+            //    //Display the original data and the decrypted data.
+            //    Console.WriteLine("Original:   {0}", original);
+            //    Console.WriteLine("Round Trip: {0}", Encoding.UTF8.GetString(encrypted));
+            //}
+            #endregion
             Console.ReadKey();
+        }
+        private static void TestSecurity(string str) {
+            Aes myAes = Aes.Create();
+            //指定key，若不指定key则每次自动生成key
+            myAes.Key = Encoding.UTF8.GetBytes("abcdef0123456789abcdef0123456789");//32位
+            myAes.IV = Encoding.UTF8.GetBytes("0000000000000000");//16位
+            byte[] encryStr = EncryStringToBytes_AES(str,myAes.Key,myAes.IV);
+            Console.WriteLine("AES String ="+Encoding.UTF8.GetString(encryStr));
+        }
+        private static byte[] EncryStringToBytes_AES(string str,byte [] key,byte [] iv) {
+            if (string.IsNullOrEmpty(str) || key.Length == 0 || iv.Length == 0)
+            {
+                Console.Write("null");
+                return null;
+            }
+            else {
+                byte[] returnBuffer;
+                using (Aes aesAlg = Aes.Create())
+                {
+                    aesAlg.Key = key;
+                    aesAlg.IV = iv;
+                    Console.WriteLine("key="+Encoding.UTF8.GetString(key));
+                    Console.WriteLine("iv=" + Encoding.UTF8.GetString(iv));
+                    // Create an encryptor to perform the stream transform.
+                    ICryptoTransform encryptor = aesAlg.CreateEncryptor(aesAlg.Key, aesAlg.IV);
+
+                    // Create the streams used for encryption.
+                    using (MemoryStream msEncrypt = new MemoryStream())
+                    {
+                        using (CryptoStream csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write))
+                        {
+                            using (StreamWriter swEncrypt = new StreamWriter(csEncrypt))
+                            {
+                                swEncrypt.Write(str);                         
+                            }
+                            returnBuffer = msEncrypt.ToArray();
+                        }
+                    }
+                }
+                return returnBuffer;
+            }
         }
         static void RegisterVoid() {
             EventDispatch.AddEventListener("GameServ.Logic.ClientLogic","Login");
+            EventDispatch.AddEventListener("GameServ.Logic.ClientLogic","SendSuccess");
           
         }
         static void StartSoc() {
@@ -241,7 +445,7 @@ namespace GameServ
             //...
         }
     }
-
+    
 
     #region 处理请求 并按照HTTP协议格式发送数据到浏览器
     /// <summary>

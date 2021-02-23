@@ -7,3 +7,12 @@ F:\Ackerman\FrameworkProj\GameServ\GameServ\GameServ\obj\Debug\GameServ.exe
 F:\Ackerman\FrameworkProj\GameServ\GameServ\GameServ\obj\Debug\GameServ.pdb
 F:\Ackerman\FrameworkProj\GameServ\GameServ\GameServ\bin\Debug\LitJson.dll
 F:\Ackerman\FrameworkProj\GameServ\GameServ\GameServ\obj\Debug\GameServ.csproj.CopyComplete
+F:\Ackerman\FrameworkProj_Copy\GameServ\GameServ\GameServ\bin\Debug\GameServ.exe.config
+F:\Ackerman\FrameworkProj_Copy\GameServ\GameServ\GameServ\bin\Debug\GameServ.exe
+F:\Ackerman\FrameworkProj_Copy\GameServ\GameServ\GameServ\bin\Debug\GameServ.pdb
+F:\Ackerman\FrameworkProj_Copy\GameServ\GameServ\GameServ\bin\Debug\LitJson.dll
+F:\Ackerman\FrameworkProj_Copy\GameServ\GameServ\GameServ\obj\Debug\GameServ.csprojAssemblyReference.cache
+F:\Ackerman\FrameworkProj_Copy\GameServ\GameServ\GameServ\obj\Debug\GameServ.csproj.CoreCompileInputs.cache
+F:\Ackerman\FrameworkProj_Copy\GameServ\GameServ\GameServ\obj\Debug\GameServ.csproj.CopyComplete
+F:\Ackerman\FrameworkProj_Copy\GameServ\GameServ\GameServ\obj\Debug\GameServ.exe
+F:\Ackerman\FrameworkProj_Copy\GameServ\GameServ\GameServ\obj\Debug\GameServ.pdb
