@@ -21,7 +21,7 @@ public class LuaRun : MonoBehaviour
     private Action luaStart;
     private Action luaUpdate;
     private Action luaDestroy;
-
+    private Image image;
     private void Awake()
     {
        

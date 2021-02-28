@@ -1,0 +1,46 @@
+编辑器拓展开发,xlua,shader,资源加载,网络+多线程
+1.编辑器拓展开发
+实现：一键快速标记ab,自动化命名ab,标记过的ab会显示在Framework
+面板上,
+可以点击选择在Assets窗体中快速锁定到该资源,也可以直接
+取消标记移除资源;在Editor环境下可不用打AB包就加载该包中
+的资源;打包AB功能.
+打包生成的manifest文件内容如下：
+============================================================
+ManifestFileVersion: 0
+CRC: 411294188
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: dd3f92c09a95451d70d525fc49bac8f6
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 5ad585dd02dfb5016c0dad519eab8f49
+HashAppended: 0
+ClassTypes:
+- Class: 49
+  Script: {instanceID: 0}
+Assets:
+- Assets/XLua/HotFix/Resources/lua/SelfieContron.lua.txt
+- Assets/XLua/HotFix/Resources/lua/test2.lua.txt
+- Assets/XLua/HotFix/Resources/lua/EndLoginManager.lua.txt
+- Assets/XLua/HotFix/Resources/lua/json.lua.txt
+- Assets/XLua/HotFix/Resources/lua/test.lua.txt
+- Assets/XLua/HotFix/Resources/lua/LoginManager.lua.txt
+Dependencies: []
+============================================================
+AssetBundleManifest中主要包含打包的文件路径
+#Framework编辑器窗体实现：
+实现一个窗体类继承EditorWindow,实现一个MenuItem方法打开窗体
+OnGUI():Unity中通过代码驱动的GUI系统主要用来创建调试工具、创建
+自定义属性面板、创建新的Editor窗口和工具达到扩展编辑器效果
+
+2.
+
+#常用的一些API:
+AssetDatabase：Editor环境下的资源数据库（仅限在Unity编辑器下）
+Selection：对Editor下选择的物体进行操作
+AssetImporter:资源导入器
+EditorWindow:编辑器窗体基类
+ScriptableObject
+Rect:代表一个矩形

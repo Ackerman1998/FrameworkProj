@@ -28,7 +28,7 @@ public class SignAssets
     }
     public static void MarkAB(string path,bool isFolder=false)
     {
-        //Debug.Log("MarkABPath="+path);
+        Debug.Log("MarkABPath="+path);
         if (!string.IsNullOrEmpty(path))
         {
             if (isFolder)
@@ -76,7 +76,7 @@ public class SignAssets
             //清除manifest文件，打包目录
             if (file.Name.EndsWith("manifest")||directory.Contains(file.Name) )
             {
-              File.Delete(file.FullName);
+               File.Delete(file.FullName);
             }
         }
     }
