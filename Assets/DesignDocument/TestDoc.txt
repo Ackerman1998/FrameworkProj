@@ -35,7 +35,35 @@ AssetBundleManifest中主要包含打包的文件路径
 OnGUI():Unity中通过代码驱动的GUI系统主要用来创建调试工具、创建
 自定义属性面板、创建新的Editor窗口和工具达到扩展编辑器效果
 
-2.
+2.xlua
+num,bool,string,userdata,function,thread,table,nil
+ipairs和pairs的区别：ipairs遍历到空值时会直接停下
+配置：复制xLua文件夹到Assets文件夹下,Tools到根目录下,在ProjectSetting的脚本
+宏定义中添加HOTFIX_ENABLE.生成xlua的映射代码，并注入到editor中.
+LuaRun原理：
+使用xLua虚拟机LuaEnv实例化一张Lua表,加载ab包中的lua字符串，将加载得到的lua
+字符串写入到对应的表中,设置一些方法，常量与lua中的绑定.
+静态方法调用：点号,非静态方法：冒号
+xlua使用协程：
+首先导入xlua的自带工具类(若要引用xlua文件，则须将xlua文件放在resources文件夹下)
+local util = require 'xlua.util'
+function UseCoroutine()
+  return util.cs_generator(
+    //code...
+  )
+end
+#2.1更新策略
+1.读取存储在本地的版本号.
+2.从远端获取最新的版本号,若版本号一致,则直接加载当前本地AB包中的UI和逻辑代码
+若不一致,则进入文件校验,使用HttpWebRequest的HEAD方法获取远端文件大小,再与本地文件
+进行对比,若文件大小不一致则加入下载队列.
+3.本地写入一个下载标记（表示是否在进行下载？）,如果没在下载,则删除本地文件,并将标记
+设置为正在下载,下载：使用文件流打开要下载文件的路径,从远端拉去文件的大小,若不一致：
+进行文件比对，从服务器获取服务器上的目标文件大小与本地文件的大小对比，若文件大小不一致,
+则设置本地文件的写入起点（Seek）,并通过HttpWebRequuest设置下载大小进行下载,再将得到的
+流写入到本地文件中.
+4.下载完成后加载AB包,进入新的界面，重置下载标记,更换版本号.
+-下载多个文件时,重复实例化下载线程进行多文件同步下载
 
 #常用的一些API:
 AssetDatabase：Editor环境下的资源数据库（仅限在Unity编辑器下）
@@ -44,3 +72,8 @@ AssetImporter:资源导入器
 EditorWindow:编辑器窗体基类
 ScriptableObject
 Rect:代表一个矩形
+unity协程是一个能够暂停协程执行，暂停后立即返回主函数，执行主函数剩余的部分，
+直到中断指令完成后，从中断指令的下一行继续执行协程剩余的函数。函数体全部执行完成，
+协程结束。
+值类型转换为引用类型：装箱
+引用类型转换为值类型：拆箱
