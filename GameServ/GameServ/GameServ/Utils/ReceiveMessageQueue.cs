@@ -20,17 +20,19 @@ namespace GameServ.Utils
             }
         }
         private void RunAction() {
+             //异步调用DoRun
              action.BeginInvoke(RunEnd, action);
         }
+        //处理消息回调
         private void RunEnd(IAsyncResult ar)
         {
-            action.EndInvoke(ar);
+            action.EndInvoke(ar);//调用结束
             if (queue.IsEmpty) {
                 isWait = true;            
                 eventWaitHandle.WaitOne();// 阻止当前线程，直到当前 System.Threading.WaitHandle 收到信号。      
                 isWait = false;
             }       
-            RunAction();
+            RunAction();//消息队列不等于空了,递归调用继续处理消息
         }
         private void DoRun() {
             try {
